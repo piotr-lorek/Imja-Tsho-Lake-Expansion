@@ -24,24 +24,24 @@ from pathlib import Path
 import rasterio
 import requests
 
+from glacial_lake.config import (
+    ACQUISITION_DATES,
+    BANDS,
+    BBOX,
+    CRS_EPSG,
+    DATA_DIR,
+    REPO_ROOT,
+    RESOLUTION_M,
+    band_path,
+)
+
 TOKEN_URL = (
     "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
 )
 PROCESS_URL = "https://sh.dataspace.copernicus.eu/api/v1/process"
 
-# Area of interest: Imja Tsho and its surroundings (Sagarmatha National Park, Nepal),
-# in WGS 84 / UTM zone 45N. Bounds are aligned to the 10 m Sentinel-2 pixel grid.
-CRS_EPSG = 32645
-BBOX = (489_120, 3_082_640, 497_070, 3_088_860)  # (min_x, min_y, max_x, max_y) in metres
-RESOLUTION_M = 10
-WIDTH = round((BBOX[2] - BBOX[0]) / RESOLUTION_M)  # 795 px
-HEIGHT = round((BBOX[3] - BBOX[1]) / RESOLUTION_M)  # 622 px
-
-ACQUISITION_DATES = ("2018-10-30", "2021-11-08", "2024-10-13")
-BANDS = ("B02", "B03", "B04", "B08", "B11")
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DATA_DIR = REPO_ROOT / "data"
+WIDTH = round((BBOX[2] - BBOX[0]) / RESOLUTION_M)
+HEIGHT = round((BBOX[3] - BBOX[1]) / RESOLUTION_M)
 
 EVALSCRIPT_TEMPLATE = """//VERSION=3
 function setup() {{
@@ -142,8 +142,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=DEFAULT_DATA_DIR,
-        help=f"output directory (default: {DEFAULT_DATA_DIR.relative_to(REPO_ROOT)}/)",
+        default=DATA_DIR,
+        help=f"output directory (default: {DATA_DIR.relative_to(REPO_ROOT)}/)",
     )
     parser.add_argument("--force", action="store_true", help="re-download existing files")
     return parser.parse_args()
@@ -164,9 +164,9 @@ def main() -> int:
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {get_access_token(client_id, client_secret)}"
 
-    for date in ACQUISITION_DATES:
+    for date in ACQUISITION_DATES.values():
         for band in BANDS:
-            out_path = args.data_dir / date / f"{band}.tif"
+            out_path = band_path(date, band, args.data_dir)
             if out_path.exists() and not args.force:
                 print(f"skip      {out_path.relative_to(args.data_dir)} (exists)")
                 continue
