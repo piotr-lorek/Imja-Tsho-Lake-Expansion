@@ -9,6 +9,7 @@ from matplotlib.figure import Figure
 from skimage.measure import find_contours
 
 from .config import FIGURES_DIR
+from .io import Scene
 from .pipeline import LakeDetection
 from .segmentation import label_components
 
@@ -59,10 +60,10 @@ def save_figure(fig: Figure, name: str, figures_dir: Path = FIGURES_DIR, dpi: in
 # --- Figures ----------------------------------------------------------------------------
 
 
-def plot_false_color_composites(detections: Mapping[int, LakeDetection]) -> Figure:
-    fig, axes = plt.subplots(1, len(detections), figsize=(18, 6), squeeze=False)
-    for ax, (year, det) in zip(axes[0], detections.items(), strict=True):
-        ax.imshow(false_color(det.scene.bands))
+def plot_false_color_composites(scenes: Mapping[int, Scene]) -> Figure:
+    fig, axes = plt.subplots(1, len(scenes), figsize=(18, 6), squeeze=False)
+    for ax, (year, scene) in zip(axes[0], scenes.items(), strict=True):
+        ax.imshow(false_color(scene.bands))
         ax.set_title(f"False Color Composite ({year})", fontsize=14, fontweight="bold")
         ax.axis("off")
     fig.tight_layout()
