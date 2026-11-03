@@ -8,7 +8,7 @@ export CDSE_CLIENT_SECRET=...
 uv run python scripts/download_data.py
 ```
 
-This writes 15 GeoTIFFs (~15 MB) to this folder:
+This writes 15 GeoTIFFs (~11 MB) to this folder:
 
 ```
 data/

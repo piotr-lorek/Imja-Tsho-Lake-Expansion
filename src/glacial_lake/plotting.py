@@ -50,10 +50,14 @@ def bounding_box(mask: np.ndarray, padding: int = 0) -> tuple[slice, slice]:
     )
 
 
-def save_figure(fig: Figure, name: str, figures_dir: Path = FIGURES_DIR, dpi: int = 150) -> Path:
+def save_figure(
+    fig: Figure, filename: str, figures_dir: Path = FIGURES_DIR, dpi: int = 100
+) -> Path:
+    """Save a figure; the format follows the extension (JPEG suits satellite imagery)."""
     figures_dir.mkdir(parents=True, exist_ok=True)
-    path = figures_dir / f"{name}.png"
-    fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    path = figures_dir / filename
+    pil_kwargs = {"quality": 85} if path.suffix.lower() in {".jpg", ".jpeg"} else None
+    fig.savefig(path, dpi=dpi, bbox_inches="tight", pil_kwargs=pil_kwargs)
     return path
 
 

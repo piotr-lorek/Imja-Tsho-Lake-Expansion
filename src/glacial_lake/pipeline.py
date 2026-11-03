@@ -26,7 +26,7 @@ class LakeDetection:
 def detect_lake(scene: Scene) -> LakeDetection:
     ndwi = indices.ndwi(scene.bands)
     mndwi = indices.mndwi(scene.bands)
-    water, threshold = segmentation.water_mask(mndwi, ndwi)
+    water, threshold = segmentation.water_mask(mndwi, ndwi, scene.bands["B08"])
     return LakeDetection(
         scene=scene,
         ndwi=ndwi,

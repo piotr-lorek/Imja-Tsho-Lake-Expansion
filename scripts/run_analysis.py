@@ -30,23 +30,21 @@ def build_figures(detections: dict[int, LakeDetection]) -> dict[str, plt.Figure]
     areas = {year: det.area_km2 for year, det in detections.items()}
     first_two = dict(list(detections.items())[:2])
     return {
-        "false_color_composites": plotting.plot_false_color_composites(
+        "false_color_composites.jpg": plotting.plot_false_color_composites(
             {year: det.scene for year, det in detections.items()}
         ),
-        "index_maps": plotting.plot_index_maps(detections),
-        "ndwi_histograms_zoomed": plotting.plot_index_histograms(
-            detections, "NDWI", xlim=(-0.3, 0.7)
-        ),
-        "mndwi_histograms_otsu": plotting.plot_index_histograms(
+        "index_maps.jpg": plotting.plot_index_maps(detections),
+        "ndwi_histograms.png": plotting.plot_index_histograms(detections, "NDWI", xlim=(-0.3, 0.7)),
+        "mndwi_histograms_otsu.png": plotting.plot_index_histograms(
             detections, "MNDWI", xlim=(-0.5, 1.0), show_otsu=True, color="teal"
         ),
-        "final_results_grid": plotting.plot_results_grid(detections),
-        "area_comparison_bar_chart": plotting.plot_area_bars(areas),
-        "lake_boundary_evolution_full": plotting.plot_boundary_evolution(detections),
-        "lake_boundary_evolution_zoomed": plotting.plot_boundary_evolution(
+        "final_results_grid.jpg": plotting.plot_results_grid(detections),
+        "area_comparison_bar_chart.png": plotting.plot_area_bars(areas),
+        "lake_boundary_evolution_full.jpg": plotting.plot_boundary_evolution(detections),
+        "lake_boundary_evolution_zoomed.jpg": plotting.plot_boundary_evolution(
             detections, zoom_padding=30
         ),
-        "fragmentation_diagnostic": plotting.plot_fragmentation(first_two),
+        "fragmentation_diagnostic.jpg": plotting.plot_fragmentation(first_two),
     }
 
 
@@ -116,8 +114,8 @@ def main() -> None:
     }
     print_summary(detections)
 
-    for name, fig in build_figures(detections).items():
-        plotting.save_figure(fig, name, args.figures_dir)
+    for filename, fig in build_figures(detections).items():
+        plotting.save_figure(fig, filename, args.figures_dir)
         plt.close(fig)
     write_results(detections, args.results)
 
