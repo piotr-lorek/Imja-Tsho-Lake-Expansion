@@ -1,0 +1,19 @@
+# Satellite data is downloaded with scripts/download_data.py
+data/*
+!data/README.md
+
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Secrets
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

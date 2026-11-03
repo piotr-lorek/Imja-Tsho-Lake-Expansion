@@ -1,0 +1,20 @@
+[project]
+name = "imja-tsho-lake-expansion"
+version = "0.1.0"
+description = "Sentinel-2 analysis of the surface-area expansion of Imja Tsho, a Himalayan glacial lake (2018–2024)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
+    "rasterio>=1.5.2",
+    "requests>=2.34.2",
+    "scikit-image>=0.26.0",
+    "scipy>=1.18.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "nbconvert>=7.17.2",
+]
