@@ -8,7 +8,6 @@ import numpy as np
 from matplotlib.figure import Figure
 from skimage.measure import find_contours
 
-from .config import FIGURES_DIR
 from .io import Scene
 from .pipeline import LakeDetection
 from .segmentation import label_components
@@ -41,18 +40,18 @@ def false_color(bands: Mapping[str, np.ndarray]) -> np.ndarray:
 
 
 def bounding_box(mask: np.ndarray, padding: int = 0) -> tuple[slice, slice]:
-    """Row and column slices around the mask, padded and clipped to the image."""
+    """Row and column slices around a non-empty mask, padded and clipped to the image."""
     coords = np.argwhere(mask)
+    if coords.size == 0:
+        raise ValueError("mask is empty")
     (row_min, col_min), (row_max, col_max) = coords.min(axis=0), coords.max(axis=0)
     return (
-        slice(max(0, row_min - padding), min(mask.shape[0], row_max + padding)),
-        slice(max(0, col_min - padding), min(mask.shape[1], col_max + padding)),
+        slice(max(0, row_min - padding), min(mask.shape[0], row_max + 1 + padding)),
+        slice(max(0, col_min - padding), min(mask.shape[1], col_max + 1 + padding)),
     )
 
 
-def save_figure(
-    fig: Figure, filename: str, figures_dir: Path = FIGURES_DIR, dpi: int = 100
-) -> Path:
+def save_figure(fig: Figure, filename: str, figures_dir: Path, dpi: int = 100) -> Path:
     """Save a figure; the format follows the extension (JPEG suits satellite imagery)."""
     figures_dir.mkdir(parents=True, exist_ok=True)
     path = figures_dir / filename
@@ -98,6 +97,8 @@ def plot_index_histograms(
 
     Marks either the Otsu threshold (``show_otsu``) or zero.
     """
+    if index not in ("NDWI", "MNDWI"):
+        raise ValueError(f"index must be 'NDWI' or 'MNDWI', not {index!r}")
     fig, axes = plt.subplots(1, len(detections), figsize=(18, 5), squeeze=False)
     for ax, (year, det) in zip(axes[0], detections.items(), strict=True):
         values = det.ndwi if index == "NDWI" else det.mndwi
@@ -151,23 +152,31 @@ def plot_results_grid(detections: Mapping[int, LakeDetection]) -> Figure:
     return fig
 
 
-def plot_area_bars(areas_km2: Mapping[int, float]) -> Figure:
+def plot_area_bars(
+    areas_km2: Mapping[int, float],
+    uncertainties_km2: Mapping[int, float] | None = None,
+    lake_name: str = "Lake",
+) -> Figure:
+    """Area per year as bars, with uncertainty whiskers if given."""
     fig, ax = plt.subplots(figsize=(8, 6))
     years = sorted(areas_km2)
     values = [areas_km2[y] for y in years]
+    errors = [uncertainties_km2[y] for y in years] if uncertainties_km2 else [0.0] * len(years)
     bars = ax.bar(
         [str(y) for y in years],
         values,
+        yerr=errors if uncertainties_km2 else None,
+        capsize=6,
         color=BAR_COLORS[: len(years)],
         edgecolor="black",
         linewidth=1.2,
         width=0.6,
     )
-    for bar in bars:
+    for bar, error in zip(bars, errors, strict=True):
         height = bar.get_height()
         ax.text(
             bar.get_x() + bar.get_width() / 2,
-            height + 0.02,
+            height + error + 0.02,
             f"{height:.3f}",
             ha="center",
             va="bottom",
@@ -175,14 +184,14 @@ def plot_area_bars(areas_km2: Mapping[int, float]) -> Figure:
             fontweight="bold",
         )
     ax.set_title(
-        f"Imja Tsho Surface Area Expansion ({years[0]}–{years[-1]})",
+        f"{lake_name} Open-Water Area ({years[0]}–{years[-1]})",
         fontsize=15,
         fontweight="bold",
         pad=15,
     )
-    ax.set_ylabel("Surface Area (km²)", fontsize=13, fontweight="bold")
+    ax.set_ylabel("Open-Water Area (km²)", fontsize=13, fontweight="bold")
     ax.set_xlabel("Year", fontsize=13, fontweight="bold")
-    ax.set_ylim(0, max(values) * 1.15)
+    ax.set_ylim(0, max(v + e for v, e in zip(values, errors, strict=True)) * 1.15)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(axis="y", linestyle="--", alpha=0.5)

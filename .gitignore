@@ -6,12 +6,16 @@ data/*
 __pycache__/
 *.py[cod]
 .venv/
+dist/
+build/
+*.egg-info/
 
 # Jupyter
 .ipynb_checkpoints/
 
 # Secrets
 .env
+.env.*
 
 # Editors / OS
 .vscode/

@@ -17,7 +17,7 @@ POND = (slice(45, 48), slice(10, 13))  # 3 x 3 = 9 px
 SNOW_PATCH = (slice(40, 58), slice(55, 78))  # 18 x 23 = 414 px
 
 
-def make_scene(*, include_snow: bool = True) -> Scene:
+def make_scene(*, include_snow: bool = True, date: str = "2000-01-01") -> Scene:
     regions = [(LAKE, WATER), (POND, WATER)]
     if include_snow:
         regions.append((SNOW_PATCH, SNOW))
@@ -28,7 +28,7 @@ def make_scene(*, include_snow: bool = True) -> Scene:
             image[window] = surface[band]
         bands[band] = image
     return Scene(
-        date="2000-01-01",
+        date=date,
         bands=bands,
         transform=Affine(10.0, 0.0, 500_000.0, 0.0, -10.0, 3_000_000.0),
         crs=CRS.from_epsg(32645),

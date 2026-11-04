@@ -2,12 +2,13 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date
 
 import numpy as np
 from scipy import ndimage
 from skimage.measure import find_contours
 
-from .segmentation import EIGHT_CONNECTIVITY, label_components
+from .segmentation import label_components
 
 M2_PER_KM2 = 1_000_000.0
 
@@ -45,7 +46,10 @@ def shape_descriptors(mask: np.ndarray, pixel_size_m: tuple[float, float]) -> Sh
 
 def containment(inner: np.ndarray, outer: np.ndarray) -> float:
     """Fraction of ``inner`` pixels that also belong to ``outer``."""
-    return float(np.count_nonzero(inner & outer) / np.count_nonzero(inner))
+    n_inner = np.count_nonzero(inner)
+    if n_inner == 0:
+        raise ValueError("inner mask is empty")
+    return float(np.count_nonzero(inner & outer) / n_inner)
 
 
 def nearby_component_sizes(
@@ -53,23 +57,33 @@ def nearby_component_sizes(
 ) -> np.ndarray:
     """Pixel counts of water components, other than the lake, within ``distance_px`` of it.
 
+    Distance is Euclidean, in pixels.
+
     Used to test whether the lake was split into pieces (e.g. by floating ice) that the
     largest-component step would have discarded. Sorted largest first.
     """
     labels, sizes = label_components(water_mask)
-    near = ndimage.binary_dilation(lake_mask, EIGHT_CONNECTIVITY, iterations=distance_px)
+    near = ndimage.distance_transform_edt(~lake_mask) <= distance_px  # Euclidean distance
     nearby = np.unique(labels[near & water_mask & ~lake_mask])
     return np.sort(sizes[nearby[nearby > 0]])[::-1]
 
 
-def boundary_length_px(mask: np.ndarray) -> int:
-    """Number of vertices on the mask's sub-pixel contour, a proxy for boundary pixels."""
+def boundary_vertex_count(mask: np.ndarray) -> int:
+    """Number of vertices on the mask's contours, including the outlines of holes.
+
+    Each vertex lies on one edge between a mask pixel and a neighbouring non-mask
+    pixel, so this counts the pixel edges along the shoreline.
+    """
     return sum(len(contour) for contour in find_contours(mask.astype(float), level=0.5))
 
 
 def boundary_uncertainty_km2(mask: np.ndarray, pixel_area_m2: float) -> float:
-    """Area uncertainty assuming each boundary pixel may be misclassified (±1 pixel)."""
-    return boundary_length_px(mask) * pixel_area_m2 / M2_PER_KM2
+    """Conservative area uncertainty: one whole pixel per shoreline contour vertex.
+
+    This is about twice the common convention of half a pixel along the perimeter.
+    It covers shoreline (mixed-pixel) error only, not the choice of thresholds.
+    """
+    return boundary_vertex_count(mask) * pixel_area_m2 / M2_PER_KM2
 
 
 @dataclass(frozen=True)
@@ -78,11 +92,20 @@ class Change:
     end: int
     absolute_km2: float
     percent: float
+    uncertainty_km2: float | None = None  # both years' uncertainties in quadrature
 
 
-def area_changes(areas_km2: Mapping[int, float]) -> list[Change]:
-    """Changes between consecutive years and over the whole period, in chronological order."""
+def area_changes(
+    areas_km2: Mapping[int, float], uncertainties_km2: Mapping[int, float] | None = None
+) -> list[Change]:
+    """Changes between consecutive years and over the whole period, in chronological order.
+
+    With ``uncertainties_km2``, each change carries the two areas' uncertainties
+    combined in quadrature.
+    """
     years = sorted(areas_km2)
+    if any(areas_km2[year] <= 0 for year in years[:-1]):
+        raise ValueError("percentage change is undefined from a zero area")
     pairs = list(zip(years, years[1:], strict=False))
     if len(years) > 2:
         pairs.append((years[0], years[-1]))
@@ -92,13 +115,38 @@ def area_changes(areas_km2: Mapping[int, float]) -> list[Change]:
             end=b,
             absolute_km2=areas_km2[b] - areas_km2[a],
             percent=(areas_km2[b] - areas_km2[a]) / areas_km2[a] * 100,
+            uncertainty_km2=(
+                None
+                if uncertainties_km2 is None
+                else float(np.hypot(uncertainties_km2[a], uncertainties_km2[b]))
+            ),
         )
         for a, b in pairs
     ]
 
 
-def compound_annual_growth_rate(areas_km2: Mapping[int, float]) -> float:
-    """Compound annual growth rate between the first and last year, as a fraction."""
+DAYS_PER_YEAR = 365.25
+
+
+def compound_annual_growth_rate(
+    areas_km2: Mapping[int, float], dates: Mapping[int, str] | None = None
+) -> float:
+    """Compound annual growth rate between the first and last year, as a fraction.
+
+    With ``dates`` (ISO acquisition date per year), the elapsed time is measured
+    between the actual acquisition dates; otherwise between the calendar years.
+    """
     years = sorted(areas_km2)
-    span = years[-1] - years[0]
-    return (areas_km2[years[-1]] / areas_km2[years[0]]) ** (1 / span) - 1
+    if len(years) < 2:
+        raise ValueError("at least two years are needed for a growth rate")
+    first, last = years[0], years[-1]
+    if dates is None:
+        span = last - first
+    else:
+        elapsed = date.fromisoformat(dates[last]) - date.fromisoformat(dates[first])
+        span = elapsed.days / DAYS_PER_YEAR
+    if span <= 0:
+        raise ValueError("the last acquisition must be later than the first")
+    if areas_km2[first] <= 0:
+        raise ValueError("growth rate is undefined from a zero area")
+    return (areas_km2[last] / areas_km2[first]) ** (1 / span) - 1

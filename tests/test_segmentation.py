@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from glacial_lake.indices import mndwi, ndwi
 from glacial_lake.segmentation import label_components, largest_component, water_mask
@@ -21,6 +22,48 @@ def test_snow_passes_without_nir_ceiling(scene):
         mndwi(scene.bands), ndwi(scene.bands), scene.bands["B08"], nir_ceiling=np.inf
     )
     assert mask[SNOW_PATCH].all()
+
+
+def one_pixel(mndwi: float, ndwi: float, nir: float) -> bool:
+    """Classify a single pixel with a fixed MNDWI threshold of 0.25."""
+    mask, _ = water_mask(np.array([mndwi]), np.array([ndwi]), np.array([nir]), threshold=0.25)
+    return bool(mask[0])
+
+
+@pytest.mark.parametrize(
+    ("mndwi", "ndwi", "nir", "is_water"),
+    [
+        (0.8, 0.3, 0.19, True),  # just below the NIR ceiling
+        (0.8, 0.3, 0.21, False),  # just above the NIR ceiling
+        (0.8, -0.05, 0.10, False),  # fails NDWI > 0
+        (0.2, 0.3, 0.10, False),  # below the MNDWI threshold
+    ],
+)
+def test_water_mask_applies_every_test(mndwi, ndwi, nir, is_water):
+    assert one_pixel(mndwi, ndwi, nir) is is_water
+
+
+def test_otsu_threshold_falls_between_the_two_modes():
+    mndwi = np.r_[np.full(900, 0.4), np.full(100, 0.8)]
+    ones = np.ones_like(mndwi)
+    mask, threshold = water_mask(mndwi, ones, ones * 0.1)
+    assert 0.4 <= threshold < 0.8
+    assert mask.sum() == 100
+
+
+def test_invalid_pixels_are_ignored():
+    mndwi = np.r_[np.full(10, 0.4), np.full(10, 0.8), np.zeros(1000)]
+    valid = np.r_[np.ones(20, dtype=bool), np.zeros(1000, dtype=bool)]
+    ones = np.ones_like(mndwi)
+    mask, threshold = water_mask(mndwi, ones, ones * 0.1, valid=valid)
+    assert 0.4 <= threshold < 0.8  # the no-data spike at 0 does not pull the threshold down
+    assert mask.sum() == 10
+
+
+def test_water_mask_rejects_all_invalid_input():
+    zeros = np.zeros(4)
+    with pytest.raises(ValueError, match="no valid"):
+        water_mask(zeros, zeros, zeros, valid=np.zeros(4, dtype=bool))
 
 
 def test_label_components_uses_eight_connectivity():

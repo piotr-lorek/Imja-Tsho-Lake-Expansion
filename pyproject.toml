@@ -3,6 +3,8 @@ name = "imja-tsho-lake-expansion"
 version = "0.1.0"
 description = "Sentinel-2 analysis of the surface-area expansion of Imja Tsho, a Himalayan glacial lake (2018–2024)."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "matplotlib>=3.11.2",

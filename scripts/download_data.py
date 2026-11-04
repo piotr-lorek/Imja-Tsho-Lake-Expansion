@@ -14,8 +14,6 @@ Files are written to data/<acquisition-date>/<band>.tif and existing files are
 skipped unless --force is given.
 """
 
-from __future__ import annotations
-
 import argparse
 import os
 import sys
@@ -23,17 +21,19 @@ from pathlib import Path
 
 import rasterio
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 from glacial_lake.config import (
     ACQUISITION_DATES,
     BANDS,
     BBOX,
     CRS_EPSG,
-    DATA_DIR,
-    REPO_ROOT,
     RESOLUTION_M,
     band_path,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = REPO_ROOT / "data"
 
 TOKEN_URL = (
     "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
@@ -54,6 +54,21 @@ function evaluatePixel(sample) {{
   return [sample.{band}];
 }}
 """
+
+
+def make_session(token: str) -> requests.Session:
+    """Authorised session that retries rate-limited (429) and server-error responses."""
+    retry = Retry(
+        total=5,
+        backoff_factor=2,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=None,  # Process API requests are POSTs, but they are idempotent
+        raise_on_status=False,  # return the last response so its error text is reported
+    )
+    session = requests.Session()
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    session.headers["Authorization"] = f"Bearer {token}"
+    return session
 
 
 def get_access_token(client_id: str, client_secret: str) -> str:
@@ -161,8 +176,7 @@ def main() -> int:
         )
         return 1
 
-    session = requests.Session()
-    session.headers["Authorization"] = f"Bearer {get_access_token(client_id, client_secret)}"
+    session = make_session(get_access_token(client_id, client_secret))
 
     for date in ACQUISITION_DATES.values():
         for band in BANDS:

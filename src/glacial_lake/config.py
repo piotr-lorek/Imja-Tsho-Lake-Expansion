@@ -1,10 +1,12 @@
-"""Study-site configuration: area of interest, acquisition dates, bands and paths."""
+"""Study-site configuration: area of interest, acquisition dates and bands.
+
+The package holds no repository paths, because it may be installed outside the
+repository. Callers (the scripts and the notebook) pass the data directory in.
+"""
 
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = REPO_ROOT / "data"
-FIGURES_DIR = REPO_ROOT / "figures"
+LAKE_NAME = "Imja Tsho"
 
 # Imja Tsho and its surroundings (Sagarmatha National Park, Nepal) in
 # WGS 84 / UTM zone 45N. Bounds are aligned to the 10 m Sentinel-2 pixel grid.
@@ -26,5 +28,5 @@ BANDS = ("B02", "B03", "B04", "B08", "B11")
 REFLECTANCE_SCALE = 10_000
 
 
-def band_path(date: str, band: str, data_dir: Path = DATA_DIR) -> Path:
+def band_path(date: str, band: str, data_dir: Path) -> Path:
     return data_dir / date / f"{band}.tif"

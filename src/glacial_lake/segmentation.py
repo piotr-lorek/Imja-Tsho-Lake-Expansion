@@ -13,14 +13,28 @@ NIR_CEILING = 0.20
 
 
 def water_mask(
-    mndwi: np.ndarray, ndwi: np.ndarray, nir: np.ndarray, nir_ceiling: float = NIR_CEILING
+    mndwi: np.ndarray,
+    ndwi: np.ndarray,
+    nir: np.ndarray,
+    nir_ceiling: float = NIR_CEILING,
+    threshold: float | None = None,
+    valid: np.ndarray | None = None,
 ) -> tuple[np.ndarray, float]:
-    """Classify open water as ``MNDWI > Otsu``, ``NDWI > 0`` and ``NIR < nir_ceiling``.
+    """Classify open water as ``MNDWI > threshold``, ``NDWI > 0`` and ``NIR < nir_ceiling``.
 
-    Returns the boolean mask and the Otsu threshold computed on the MNDWI.
+    The MNDWI threshold is found with Otsu's method unless ``threshold`` is given (for
+    example one pooled over several dates). Pixels outside ``valid`` (no data) are left
+    out of the Otsu histogram and are never water.
+
+    Returns the boolean mask and the MNDWI threshold used.
     """
-    threshold = float(threshold_otsu(mndwi.ravel()))
-    return (mndwi > threshold) & (ndwi > 0) & (nir < nir_ceiling), threshold
+    if valid is None:
+        valid = np.ones(mndwi.shape, dtype=bool)
+    if threshold is None:
+        if not valid.any():
+            raise ValueError("no valid pixels to threshold")
+        threshold = float(threshold_otsu(mndwi[valid]))
+    return valid & (mndwi > threshold) & (ndwi > 0) & (nir < nir_ceiling), threshold
 
 
 def label_components(mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

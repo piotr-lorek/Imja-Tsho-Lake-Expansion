@@ -8,6 +8,8 @@ export CDSE_CLIENT_SECRET=...
 uv run python scripts/download_data.py
 ```
 
+On Windows (PowerShell), use `$env:CDSE_CLIENT_ID = "..."` and `$env:CDSE_CLIENT_SECRET = "..."`. Use `--data-dir` to write elsewhere and `--force` to re-download existing files.
+
 This writes 15 GeoTIFFs (~11 MB) to this folder:
 
 ```
@@ -37,9 +39,10 @@ data/
 
 Processing notes:
 
-- **Harmonised values.** Products from processing baseline 04.00 onward (January 2022 and later, so the 2024 scene) carry a −1000 radiometric offset. The download requests `harmonizeValues`, which removes that offset, so all three dates use the same scale.
+- **Harmonised values.** Products from processing baseline 04.00 onward (all acquisitions since January 2022, and any older product that has been reprocessed) carry a −1000 radiometric offset. The download requests `harmonizeValues`, which removes that offset wherever it applies, so all three dates use the same scale. Negative values are clamped to 0.
 - **B11 resampling.** B11 is natively 20 m. It is upsampled to the 10 m grid with nearest-neighbour, so no values are interpolated.
-- **Scene selection.** If several granules cover the area on a date, the least cloudy one is used (`leastCC`).
+- **Scene selection.** If several tiles cover the area on a date, they are mosaicked with `leastCC`: each pixel comes from the tile with the lowest cloud cover in its metadata (cloud cover of the whole ~110 km tile, not of this area).
+- **No data.** Pixels without data are 0 in every band. The analysis excludes them; these three scenes have none.
 
 ## Attribution
 

@@ -11,6 +11,10 @@ download_data = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(download_data)
 
 
+def test_default_data_dir_is_in_the_repository():
+    assert SCRIPT.parents[1] / "data" == download_data.DATA_DIR
+
+
 def test_output_grid_is_10_m():
     assert (download_data.WIDTH, download_data.HEIGHT) == (795, 622)
 
@@ -47,3 +51,12 @@ def test_partial_credentials_exit_with_error(monkeypatch, missing):
     monkeypatch.delenv(missing)
     monkeypatch.setattr("sys.argv", ["download_data.py"])
     assert download_data.main() == 1
+
+
+def test_session_retries_rate_limits_and_server_errors():
+    session = download_data.make_session("token")
+    retry = session.get_adapter("https://sh.dataspace.copernicus.eu").max_retries
+    assert session.headers["Authorization"] == "Bearer token"
+    assert retry.total > 0
+    assert {429, 503} <= set(retry.status_forcelist)
+    assert retry.is_retry("POST", 429)

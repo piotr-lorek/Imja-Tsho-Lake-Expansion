@@ -9,7 +9,7 @@ import rasterio
 from rasterio.crs import CRS
 from rasterio.transform import Affine
 
-from .config import BANDS, DATA_DIR, REFLECTANCE_SCALE, band_path
+from .config import BANDS, REFLECTANCE_SCALE, band_path
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,11 @@ class Scene:
         return next(iter(self.bands.values())).shape
 
     @property
+    def valid_mask(self) -> np.ndarray:
+        """Pixels with data. Sentinel Hub fills pixels without data with 0 in every band."""
+        return np.any([band > 0 for band in self.bands.values()], axis=0)
+
+    @property
     def pixel_size_m(self) -> tuple[float, float]:
         """Pixel (width, height) in metres."""
         return abs(self.transform.a), abs(self.transform.e)
@@ -36,11 +41,11 @@ class Scene:
         return width * height
 
 
-def load_scene(date: str, data_dir: Path = DATA_DIR, bands: Iterable[str] = BANDS) -> Scene:
+def load_scene(date: str, data_dir: Path, bands: Iterable[str] = BANDS) -> Scene:
     """Read the given bands for one date and convert them to reflectance in [0, 1].
 
-    All bands must share the same grid; they are expected as produced by
-    ``scripts/download_data.py``.
+    Bands are read from ``data_dir/<date>/<band>.tif``, as written by
+    ``scripts/download_data.py``. All bands must share the same grid.
     """
     reflectance: dict[str, np.ndarray] = {}
     transform = crs = None
